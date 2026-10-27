@@ -1,0 +1,7 @@
+.git
+data
+datasets
+**/__pycache__
+**/.pytest_cache
+.env
+*.zip

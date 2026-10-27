@@ -1,0 +1,18 @@
+# Dữ liệu chạy local và dataset tải về — không đưa lên GitHub
+data/
+datasets/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Bí mật
+.env
+
+# Editor / hệ điều hành
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

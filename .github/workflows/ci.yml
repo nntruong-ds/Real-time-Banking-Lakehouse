@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint Python (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install flake8==7.1.1
+      - run: flake8 --max-line-length 100 spark_jobs data_generator tests
+
+  test:
+    name: Unit test (PySpark 3.5 local)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      # Cùng phiên bản Spark với image chạy thật (docker/spark/Dockerfile)
+      - run: pip install pyspark==3.5.6 -r docker/spark/requirements-spark.txt
+      - run: python -m pytest -q tests
+
+  compose:
+    name: Kiểm tra cú pháp docker-compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --profile realtime --profile jobs config --quiet

@@ -1,0 +1,6 @@
+# Giữ xuống dòng kiểu Linux cho script, tránh lỗi "\r" khi chạy trong container
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+*.properties text eol=lf
+Dockerfile text eol=lf
