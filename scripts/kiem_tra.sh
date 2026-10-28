@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Kiểm tra sức khỏe toàn bộ hệ thống bằng MỘT lệnh (9 nhóm):
+# Kiểm tra sức khỏe toàn bộ hệ thống bằng MỘT lệnh (10 nhóm):
 #
 #     bash scripts/kiem_tra.sh
 #
@@ -36,7 +36,9 @@ for c in object-store nessie-db nessie kafka trino producer bronze-stream silver
     bad "$c: chưa được tạo  →  docker compose --profile realtime up -d"; continue
   fi
   read -r status restarts health <<< "$info"
-  if [ "$status" != "running" ]; then
+  if [ "$status" != "running" ] && [[ " producer bronze-stream silver-stream " == *" $c "* ]]; then
+    warn "$c: đang tắt (luồng realtime; bật lại khi cần: docker compose --profile realtime start)"
+  elif [ "$status" != "running" ]; then
     bad "$c: $status  →  docker logs --tail 50 $c"
   elif [ "$health" = "unhealthy" ]; then
     bad "$c: đang chạy nhưng unhealthy  →  docker logs --tail 50 $c"
@@ -181,7 +183,7 @@ else warn "Chưa có bảng dbt  →  docker compose --profile jobs run --rm dbt
 
 v=$(q "SELECT count(*) FROM iceberg.information_schema.tables WHERE table_schema = 'ops' AND table_name = 'maintenance_log'")
 if is_num "$v" && [ "$v" -eq 1 ]; then
-  r=$(q "SELECT concat(cast(files_before AS varchar), ' ', cast(files_after AS varchar), ' ', cast(query_sec_before AS varchar), ' ', cast(query_sec_after AS varchar)) FROM iceberg.ops.maintenance_log WHERE table_name = 'lakehouse.bronze.transactions_raw' ORDER BY run_time DESC LIMIT 1")
+  r=$(q "SELECT concat(cast(files_before AS varchar), ' ', cast(files_after AS varchar), ' ', format('%.2f', query_sec_before), ' ', format('%.2f', query_sec_after)) FROM iceberg.ops.maintenance_log WHERE table_name = 'lakehouse.bronze.transactions_raw' ORDER BY run_time DESC LIMIT 1")
   if [ -n "$r" ]; then
     read -r fb fa qb qa <<< "$r"
     ok "Lần bảo trì gần nhất (Bronze): $fb → $fa file, truy vấn $qb s → $qa s"
@@ -199,6 +201,23 @@ else
   if is_num "$n" && [ "$n" -ge 3 ]; then ok "Airflow ($af) có đủ 3 DAG lakehouse"
   else warn "Airflow ($af) chưa thấy DAG lakehouse  →  bash scripts/noi_airflow_co_san.sh"; fi
 fi
+
+# -----------------------------------------------------------------------------
+hdr "10. Dashboard Superset (Giai đoạn 5)"
+v=$(q "SELECT count(*) FROM iceberg.marts.kpi_summary")
+if is_num "$v" && [ "$v" -eq 1 ]; then
+  r=$(q "SELECT concat(format('%.1f', pct_fraud_amount_caught), ' ', format('%.1f', latency_p50_sec), ' ', format('%.1f', latency_p95_sec)) FROM iceberg.marts.kpi_summary")
+  read -r pct p50 p95 <<< "$r"
+  ok "kpi_summary: chặn được $pct% tiền gian lận (TEST) · độ trễ streaming p50 $p50 s, p95 $p95 s"
+else
+  warn "Chưa có marts.kpi_summary  →  docker compose --profile jobs run --rm dbt"
+fi
+st=$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' superset 2>/dev/null)
+if [ -z "$st" ]; then warn "Superset chưa bật (tùy chọn)  →  docker compose --profile bi up -d"
+elif [[ "$st" == "running healthy" ]]; then
+  if docker logs superset 2>&1 | grep -q "Da nap dashboard"; then ok "Superset đang chạy, đã nạp dashboard từ code: http://localhost:8088"
+  else warn "Superset chạy nhưng chưa nạp được dashboard  →  docker logs superset 2>&1 | grep -A5 LOI"; fi
+else warn "Superset: $st (vừa bật thì đợi 1–2 phút)  →  docker logs --tail 30 superset"; fi
 
 if [ -s "$LASTERR" ]; then
   echo; echo "── Lỗi Trino gần nhất (nguyên nhân của các dấu ? ở trên) ──"
