@@ -3,8 +3,9 @@
 Lakehouse xử lý giao dịch thẻ ngân hàng — vừa **batch** (nạp lịch sử) vừa **streaming** (thời gian thực) — chạy hoàn toàn trên máy local bằng Docker:
 **Kafka → Spark Structured Streaming → Apache Iceberg (catalog Nessie, kho S3) → Trino**.
 
-> **Trạng thái: Giai đoạn 2 — Dữ liệu thật.** Dữ liệu là dataset giao dịch thẻ công khai **Sparkov** (Kaggle, ~1,85 triệu giao dịch, có nhãn gian lận).
+> **Trạng thái: Giai đoạn 3 — Gold và chấm điểm gian lận.** Dữ liệu là dataset giao dịch thẻ công khai **Sparkov** (Kaggle, ~1,85 triệu giao dịch, có nhãn gian lận).
 > Lịch sử 2019 → 06/2020 nạp bằng job batch; nửa cuối 2020 được phát lại qua Kafka như hệ thống thanh toán đang chạy.
+> Tầng Gold tính đặc trưng theo thẻ, chấm điểm bằng **scorecard WoE** học trên lịch sử, và đo precision/recall trên 6 tháng cuối 2020 mà scorecard chưa từng thấy.
 
 Hướng dẫn viết cho **Ubuntu 22.04 / 24.04**, máy **16 GB RAM**. Mọi lệnh gõ trong Terminal, đứng trong thư mục dự án.
 
@@ -19,6 +20,11 @@ Hướng dẫn viết cho **Ubuntu 22.04 / 24.04**, máy **16 GB RAM**. Mọi l�
  fraudTest.csv ─► [producer] ─► Kafka ─┬─► [bronze-stream] ─┬─► hợp lệ ─► bronze.transactions_raw  (bản thô, có PII)
  (06 → 12/2020)  phát lại x3600        │                    └─► lỗi ────► bronze.dlq + Kafka topic dlq_transactions
                                        └─► [silver-stream] ──► hợp lệ ─► bỏ trùng · che PII ─► silver.transactions
+                                                                                                   │
+ silver.transactions ─► [gold] (batch) ─► đặc trưng theo thẻ ─► scorecard WoE ─┬─► gold.transaction_features
+                        học trên TRAIN (≤ 21/06/2020), đo trên TEST            ├─► gold.scorecard
+                                                                               ├─► gold.fraud_alerts (kèm lý do)
+                                                                               └─► gold.model_metrics
 
 Bảng Iceberg:  metadata trong Nessie (lưu ở Postgres)  ·  file Parquet trên kho S3 (RustFS)
 Truy vấn:      Trino  (catalog "iceberg")
@@ -61,6 +67,10 @@ Dữ liệu thật không có lỗi hay bản trùng, nên producer **cài thêm
 - **Backfill chạy lại không trùng**: ghi bằng `MERGE INTO ... WHEN NOT MATCHED THEN INSERT` theo `transaction_id`.
 - **Silver đọc Kafka, không đọc bảng Bronze**: nguồn streaming Iceberg ghi file offset vào checkpoint bằng FileIO của bảng; Nessie luôn gửi `io-impl = S3FileIO` cho mỗi bảng (ghi đè cấu hình Spark), mà S3FileIO không ghi được checkpoint cục bộ → lỗi `Invalid S3 URI`. Hai job cùng đọc Kafka với checkpoint riêng; Bronze vẫn là bản lưu thô để đối chiếu và nạp lại.
 - **Watermark bỏ trùng 2 giờ (theo thời gian giao dịch)**: producer tua nhanh 3600 lần, các partition Kafka có thể lệch nhau vài phút thời gian giao dịch; watermark ngắn sẽ làm rơi bản ghi đến trễ.
+- **Partition theo tháng, không theo ngày**: dataset chỉ ~3 nghìn giao dịch/ngày; chia theo ngày sinh hàng nghìn file nhỏ và bắt mỗi mẻ stream mở hàng chục file cùng lúc. Bảng cũ được đổi tại chỗ bằng partition evolution của Iceberg.
+- **Tắt `spark.sql.constraintPropagation`**: bộ lọc `error_reason IS NULL` (CASE WHEN của 10 luật) trên 29 cột làm bộ tối ưu Spark sinh ràng buộc theo cấp số nhân → tràn heap ngay lúc lập kế hoạch. `tests/test_streaming_plan.py` giữ lỗi này không quay lại.
+- **Chấm điểm bằng scorecard WoE, không dùng mô hình hộp đen**: cách ngân hàng vẫn dùng cho chấm điểm rủi ro — mỗi cảnh báo có lý do đọc được (`hour=23`, `category_amount=shopping_net|800-1000`), bảng điểm nằm ngay trong lakehouse để kiểm toán.
+- **Đánh giá trung thực**: học WoE và chọn ngưỡng chỉ trên TRAIN (fraudTrain); precision/recall báo cáo trên TEST (fraudTest). Đặc trưng theo thẻ chỉ dùng giao dịch **trước** giao dịch đang xét (`tests/test_gold.py` kiểm tra).
 
 ---
 
@@ -145,7 +155,7 @@ docker compose ps -a
 docker compose --profile jobs run --rm spark-tools
 ```
 
-**Kết quả đúng:** dòng cuối `15 passed`.
+**Kết quả đúng:** dòng cuối `25 passed`.
 
 | File test | Kiểm tra gì |
 | --- | --- |
@@ -224,7 +234,7 @@ Spark UI: http://localhost:4040 (Bronze), http://localhost:4041 (Silver), tab **
 bash scripts/kiem_tra.sh
 ```
 
-Script kiểm tra 7 nhóm — container, Kafka, log lỗi, dữ liệu có đang chảy không, chất lượng (DLQ, bỏ trùng), bảo mật PII, dữ liệu lịch sử — và in ✅ / ⚠️ / ❌ kèm gợi ý sửa. Dòng cuối `0 lỗi` là hệ thống chạy tốt. ⚠️ trong 3 phút đầu sau khi bật là bình thường.
+Script kiểm tra 8 nhóm — container, Kafka, log lỗi, dữ liệu có đang chảy không, chất lượng (DLQ, bỏ trùng), bảo mật PII, dữ liệu lịch sử, tầng Gold — và in ✅ / ⚠️ / ❌ kèm gợi ý sửa. Dòng cuối `0 lỗi` là hệ thống chạy tốt. ⚠️ trong 3 phút đầu sau khi bật là bình thường.
 
 ---
 
@@ -249,12 +259,40 @@ Xem file dữ liệu: http://localhost:9001 (admin / password) → bucket `wareh
 
 ---
 
-## Bước 8 — Đẩy lên GitHub
+## Bước 8 — Tầng Gold và chấm điểm gian lận
+
+Chạy khi Silver đã có cả lịch sử (Bước 4) lẫn dữ liệu stream (Bước 5). Không cần tắt realtime; nếu máy chậm, `docker stop producer` trước.
+
+```bash
+docker compose --profile jobs run --rm gold
+```
+
+Job chạy vài phút, in ra:
+
+1. Số giao dịch TRAIN / TEST và số vụ gian lận trong mỗi phần.
+2. Sức mạnh (IV) của từng đặc trưng — đặc trưng nào thực sự giúp phát hiện gian lận.
+3. Ngưỡng điểm chọn trên TRAIN, và **bảng đánh đổi precision ↔ recall trên TEST**.
+4. Kết quả cuối trên TEST: precision, recall, F1, ROC-AUC.
+
+Rồi xem chi tiết bằng [`sql/check_gold.sql`](sql/check_gold.sql): kết quả lần chạy mới nhất (câu 2), đặc trưng mạnh nhất (câu 4), hàng đợi cảnh báo kèm lý do (câu 6), gian lận bị bỏ sót (câu 7).
+
+| Bảng | Chứa gì |
+| --- | --- |
+| `gold.transaction_features` | Mọi giao dịch: đặc trưng theo thẻ, điểm, có cảnh báo không, lý do |
+| `gold.scorecard` | Bảng điểm: (đặc trưng, ô) → số giao dịch, tỷ lệ gian lận, WoE, IV |
+| `gold.fraud_alerts` | Các giao dịch bị cảnh báo — hàng đợi cho người duyệt |
+| `gold.model_metrics` | Precision/recall/F1/AUC mỗi lần chạy (giữ lịch sử để so sánh) |
+
+Chạy lại bao nhiêu lần cũng được: 3 bảng đầu được thay nguyên khối trong một commit Iceberg, `model_metrics` thêm dòng mới.
+
+---
+
+## Bước 9 — Đẩy lên GitHub
 
 ```bash
 git add .
 git status            # KHÔNG được thấy .env hay datasets/
-git commit -m "Giai doan 2: du lieu that Sparkov, batch backfill, PII mo rong"
+git commit -m "Giai doan 3: tang Gold, scorecard WoE, danh gia precision/recall"
 git push
 ```
 
@@ -276,6 +314,8 @@ Mỗi lần push, GitHub Actions tự chạy lint, unit test và kiểm tra `doc
 | Dừng producer cho máy nhẹ | `docker stop producer` |
 | Sửa code Spark xong, chạy lại job | `docker restart bronze-stream silver-stream` |
 | Sửa `replay.py` hoặc Dockerfile | `docker compose --profile realtime --profile jobs build` rồi `docker compose --profile realtime up -d` |
+| Tính lại tầng Gold và điểm gian lận | `docker compose --profile jobs run --rm gold` |
+| Gỡ một mẻ streaming bị kẹt (tràn bộ nhớ lặp lại) | `bash scripts/go_me_ket.sh` |
 | Mở Spark SQL để thử | `docker compose --profile jobs run --rm spark-tools spark-sql` |
 | **Xóa sạch, làm lại từ đầu** | `docker compose --profile realtime --profile jobs down -v` |
 
@@ -295,6 +335,10 @@ Code Spark và `spark-defaults.conf` được gắn thẳng từ máy vào conta
 | `No such service` khi `docker compose logs ...` | Service thuộc profile `realtime`: dùng `docker logs -f <tên>` |
 | Build lỗi ở `ADD https://repo1.maven.org/...` | Mạng chập chờn khi tải thư viện Java. Chạy lại lệnh build |
 | Container `Exited (137)` | Thiếu RAM: `docker stop producer`, đóng bớt ứng dụng, không chạy backfill cùng lúc với realtime |
+| Job streaming tràn heap lặp đi lặp lại, stack trace có `catalyst ... canonicalized` | Thiếu dòng `spark.sql.constraintPropagation.enabled false` trong `docker/spark/spark-defaults.conf`. Thêm vào rồi `docker compose --profile realtime up -d --force-recreate bronze-stream silver-stream` |
+| Job streaming tràn heap mãi ở cùng một mẻ quá lớn | `bash scripts/go_me_ket.sh` (xóa kế hoạch của mẻ chưa hoàn thành; không mất, không trùng dữ liệu) |
+| Trino báo `server is still initializing` giữa chừng, `kiem_tra.sh` ra dấu `?` | Trino vừa bị tắt vì vượt RAM. Kiểm tra có file `docker/trino/jvm.config` (heap 2 GB) và `mem_limit: 3g`, rồi `docker compose up -d --force-recreate trino` |
+| `gold` báo `TRAIN khong co giao dich gian lan nao` | Chưa nạp lịch sử: chạy backfill (Bước 4) trước |
 | `port is already allocated` | `sudo ss -ltnp \| grep <cổng>`; đổi số **bên trái** trong `ports:` |
 
 Gặp lỗi khác: chạy `bash scripts/kiem_tra.sh` và gửi toàn bộ kết quả.
@@ -311,21 +355,25 @@ realtime-banking-lakehouse/
 ├── datasets/sparkov/               # Dataset tải từ Kaggle (không đưa lên GitHub)
 ├── docker/
 │   ├── spark/                      # Dockerfile Spark 3.5.9 + Iceberg + Kafka; spark-defaults.conf
-│   └── trino/catalog/iceberg.properties
+│   └── trino/                      # catalog/iceberg.properties, jvm.config (heap 2 GB)
 ├── data_generator/replay.py        # Producer phát lại CSV vào Kafka theo nhịp thời gian
 ├── spark_jobs/
 │   ├── bronze_ingestion.py         # Stream: Kafka -> Bronze + DLQ
 │   ├── silver_transformation.py    # Stream: Kafka -> Silver
 │   ├── batch_backfill.py           # Batch: CSV lịch sử -> Bronze + DLQ + Silver (MERGE)
+│   ├── gold_scoring.py             # Batch: Silver -> đặc trưng, scorecard, cảnh báo, đánh giá
 │   └── common/
 │       ├── schema.py               # Sự kiện chuẩn: CSV/Kafka -> JSON -> cột có kiểu
 │       ├── validation.py           # 10 luật nghiệp vụ
 │       ├── pii.py                  # HMAC, tuổi, khoảng cách
 │       ├── tables.py               # DDL các bảng, bỏ trùng, biến đổi sang Silver
+│       ├── gold.py                 # Đặc trưng theo thẻ, WoE, chấm điểm, precision/recall/AUC
 │       └── streaming.py            # Đọc Kafka, in tiến độ
-├── tests/                          # 15 unit test + dữ liệu mẫu tự sinh
-├── sql/                            # Câu SQL khám phá cho Trino
-└── scripts/kiem_tra.sh             # Kiểm tra sức khỏe toàn hệ thống bằng 1 lệnh
+├── tests/                          # 25 unit test + dữ liệu mẫu tự sinh
+├── sql/                            # check_bronze / check_silver / check_gold cho Trino
+└── scripts/
+    ├── kiem_tra.sh                 # Kiểm tra sức khỏe toàn hệ thống bằng 1 lệnh
+    └── go_me_ket.sh                # Gỡ mẻ streaming bị kẹt
 ```
 
 ## Bản đồ cổng
@@ -335,14 +383,14 @@ realtime-banking-lakehouse/
 | http://localhost:19120 | Nessie UI — branch, commit, danh sách bảng |
 | http://localhost:9001 | Kho S3 (RustFS) — admin / password |
 | http://localhost:8085 | Trino UI |
-| http://localhost:4040 / 4041 / 4042 | Spark UI của Bronze / Silver / backfill |
+| http://localhost:4040 / 4041 / 4042 / 4043 | Spark UI của Bronze / Silver / backfill / gold |
 | localhost:9092 | Kafka (cho chương trình chạy trên máy bạn) |
 
 ## Lộ trình
 
 - [x] **Giai đoạn 1** — Nền móng: Kafka → Bronze + DLQ → Silver, HMAC, ghim phiên bản, Nessie, job như service, CI
 - [x] **Giai đoạn 2** — Dữ liệu thật Sparkov: producer phát lại, batch backfill dùng chung code với stream, PII mở rộng
-- [ ] **Giai đoạn 3** — Gold: đặc trưng theo thẻ (cửa sổ trượt, khoảng cách, tốc độ chi tiêu), fraud score, precision/recall theo nhãn thật
+- [ ] **Giai đoạn 3** — Gold: đặc trưng theo thẻ (tần suất 1h/24h, chi tiêu so với 30 ngày, khoảng cách), scorecard WoE có lý do, precision/recall/AUC theo nhãn thật *(đang làm)*
 - [ ] **Giai đoạn 4** — dbt (Gold batch + test đối soát) và Airflow (backfill theo tháng, dbt định kỳ, bảo trì Iceberg)
 - [ ] **Giai đoạn 5** — Superset dashboard dạng code; đo độ trễ p50/p95
 - [ ] **Giai đoạn 6** — CD (đẩy image lên GHCR), benchmark trước/sau bảo trì, hoàn thiện README

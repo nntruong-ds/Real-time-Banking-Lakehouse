@@ -300,6 +300,7 @@ services:
     command: ["python3", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"]
     volumes:
       - ./spark_jobs:/opt/app/spark_jobs:ro
+      - ./docker/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
       - ./tests:/opt/app/tests:ro
       - ./data_generator:/opt/app/data_generator:ro
     restart: "no"
@@ -328,6 +329,27 @@ services:
         condition: service_healthy
     ports:
       - "4042:4040"   # Spark UI của job backfill (chỉ mở khi đang chạy)
+    restart: "no"
+    mem_limit: 3g
+
+  # Tầng Gold + chấm điểm gian lận (Giai đoạn 3). Đọc Silver, ghi 4 bảng lakehouse.gold.*.
+  # Chạy lại bao nhiêu lần cũng được (thay nguyên bảng); model_metrics giữ lịch sử mỗi lần chạy.
+  #   docker compose --profile jobs run --rm gold
+  gold:
+    <<: *spark
+    container_name: gold
+    profiles: [jobs]
+    entrypoint: ["spark-submit", "--master", "local[2]", "--driver-memory", "2g",
+                 "--name", "gold_scoring", "/opt/app/spark_jobs/gold_scoring.py"]
+    command: []
+    environment:
+      <<: *spark-env
+      SPLIT_TIME: "2020-06-21 12:14:00"   # trước mốc này = TRAIN (học), từ mốc này = TEST (đo)
+    depends_on:
+      nessie:
+        condition: service_healthy
+    ports:
+      - "4043:4040"   # Spark UI của job Gold (chỉ mở khi đang chạy)
     restart: "no"
     mem_limit: 3g
 

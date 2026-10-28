@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Kiểm tra sức khỏe toàn bộ hệ thống bằng MỘT lệnh:
+# Kiểm tra sức khỏe toàn bộ hệ thống bằng MỘT lệnh (8 nhóm):
 #
 #     bash scripts/kiem_tra.sh
 #
@@ -148,6 +148,31 @@ v=$(q "SELECT count(*) FROM iceberg.silver.transactions WHERE is_fraud = 1")
 if is_num "$v" && [ "$v" -gt 0 ]; then ok "Silver có $v giao dịch gian lận có nhãn (dùng ở Giai đoạn 3)"; fi
 
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+hdr "8. Tầng Gold và chấm điểm gian lận (Giai đoạn 3)"
+v=$(q "SELECT count(*) FROM iceberg.information_schema.tables WHERE table_schema = 'gold'")
+if ! is_num "$v" || [ "$v" -eq 0 ]; then
+  warn "Chưa có tầng Gold  →  docker compose --profile jobs run --rm gold"
+else
+  g=$(q "SELECT count(*) FROM iceberg.gold.transaction_features")
+  s=$(q "SELECT count(*) FROM iceberg.silver.transactions")
+  if is_num "$g" && is_num "$s" && [ "$g" -eq "$s" ]; then
+    ok "Gold có đủ $g giao dịch (bằng Silver)"
+  elif is_num "$g" && is_num "$s"; then
+    warn "Gold có $g giao dịch, Silver có $s — Silver đã có thêm dữ liệu, chạy lại job gold để cập nhật"
+  fi
+  r=$(q "SELECT concat(format('%.3f', precision), ' ', format('%.3f', recall), ' ', format('%.3f', coalesce(roc_auc, 0)), ' ', cast(alerts AS varchar)) FROM iceberg.gold.model_metrics WHERE split = 'test' AND is_chosen AND run_time = (SELECT max(run_time) FROM iceberg.gold.model_metrics)")
+  if [ -n "$r" ]; then
+    read -r p rc auc al <<< "$r"
+    ok "Kết quả trên TEST lần chạy mới nhất: precision $p · recall $rc · ROC-AUC $auc · $al cảnh báo"
+  else
+    warn "Chưa có kết quả đánh giá trên TEST (producer đã phát fraudTest chưa?)"
+  fi
+  v=$(q "SELECT count(*) FROM iceberg.gold.fraud_alerts WHERE cardinality(reasons) = 0")
+  if is_num "$v" && [ "$v" -eq 0 ]; then ok "Mọi cảnh báo đều có lý do đi kèm"
+  elif is_num "$v"; then warn "$v cảnh báo không có lý do (ngưỡng điểm quá thấp?)"; fi
+fi
+
 if [ -s "$LASTERR" ]; then
   echo; echo "── Lỗi Trino gần nhất (nguyên nhân của các dấu ? ở trên) ──"
   cat "$LASTERR"

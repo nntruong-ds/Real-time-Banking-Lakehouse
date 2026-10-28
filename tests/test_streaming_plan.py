@@ -19,11 +19,15 @@ from common.validation import with_error_reason
 from replay import row_to_event
 from sample_data import make_rows
 
-DEFAULTS = os.path.join(os.path.dirname(__file__), "..", "docker", "spark", "spark-defaults.conf")
+# Chạy trên máy/CI: file trong repo. Chạy trong container spark-tools: file đã gắn vào Spark.
+REPO = os.path.join(os.path.dirname(__file__), "..")
+CANDIDATES = [os.path.join(REPO, "docker", "spark", "spark-defaults.conf"),
+              "/opt/spark/conf/spark-defaults.conf"]
 
 
 def test_defaults_disable_constraint_propagation():
-    lines = [ln.split() for ln in open(DEFAULTS, encoding="utf-8")
+    path = next(p for p in CANDIDATES if os.path.exists(p))
+    lines = [ln.split() for ln in open(path, encoding="utf-8")
              if ln.strip() and not ln.startswith("#")]
     assert ["spark.sql.constraintPropagation.enabled", "false"] in lines
 
