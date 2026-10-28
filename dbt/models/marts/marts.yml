@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: fct_daily_fraud
+    description: Gian lận theo ngày (một dòng = một ngày x train/test)
+    columns:
+      - name: event_date
+        data_tests: [not_null]
+      - name: split
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["train", "test"]
+
+  - name: dim_card_risk
+    description: Hồ sơ rủi ro theo thẻ (đã che số thẻ)
+    columns:
+      - name: card_token
+        data_tests: [not_null, unique]
+      - name: risk_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["compromised", "watch", "normal"]
+
+  - name: agg_category_month
+    description: Danh mục x tháng
+    columns:
+      - name: month_start
+        data_tests: [not_null]
+      - name: category
+        data_tests: [not_null]

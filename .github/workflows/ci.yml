@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install flake8==7.1.1
-      - run: flake8 --max-line-length 100 spark_jobs data_generator tests
+      - run: flake8 --max-line-length 100 spark_jobs data_generator tests airflow/dags
 
   test:
     name: Unit test (PySpark 3.5 local)
@@ -41,9 +41,37 @@ jobs:
       - run: pip install pyspark==3.5.6 -r docker/spark/requirements-spark.txt
       - run: python -m pytest -q tests
 
+  dbt:
+    name: Kiểm tra dự án dbt (parse, không cần Trino)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install dbt-core==1.11.16 dbt-trino==1.10.6
+      - run: dbt parse --project-dir dbt --profiles-dir dbt
+        env:
+          DO_NOT_TRACK: "1"
+
+  airflow:
+    name: Kiểm tra DAG Airflow nạp được
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: >
+          pip install "apache-airflow==3.3.2" "apache-airflow-providers-docker==4.5.9" pytest
+          --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
+      - run: python -m pytest -q tests/test_dags.py
+        env:
+          AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+
   compose:
     name: Kiểm tra cú pháp docker-compose
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose --profile realtime --profile jobs config --quiet
+      - run: docker compose --profile realtime --profile jobs --profile airflow config --quiet

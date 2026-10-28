@@ -2,6 +2,10 @@
 data/
 datasets/
 
+# dbt (file sinh ra khi chạy dbt trên máy)
+dbt/target/
+dbt/logs/
+
 # Python
 __pycache__/
 *.pyc

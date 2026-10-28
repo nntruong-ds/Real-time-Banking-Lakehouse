@@ -1,0 +1,41 @@
+version: 2
+
+# Các bảng do Spark ghi (Bronze, Silver, Gold). dbt chỉ ĐỌC chúng.
+sources:
+  - name: bronze
+    database: iceberg
+    schema: bronze
+    tables:
+      - name: transactions_raw
+        description: Bản ghi hợp lệ nguyên trạng từ Kafka và backfill (giữ cả bản trùng, có PII)
+      - name: dlq
+        description: Bản ghi vi phạm luật nghiệp vụ, kèm lý do
+
+  - name: silver
+    database: iceberg
+    schema: silver
+    tables:
+      - name: transactions
+        description: Đã bỏ trùng và che PII
+        columns:
+          - name: transaction_id
+            data_tests: [not_null, unique]
+
+  - name: gold
+    database: iceberg
+    schema: gold
+    tables:
+      - name: transaction_features
+        description: Mọi giao dịch kèm đặc trưng theo thẻ, điểm gian lận, lý do
+        columns:
+          - name: transaction_id
+            data_tests: [not_null, unique]
+          - name: split
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ["train", "test"]
+      - name: fraud_alerts
+        description: Giao dịch bị cảnh báo (điểm >= ngưỡng)
+      - name: model_metrics
+        description: Precision/recall/AUC mỗi lần chạy job gold

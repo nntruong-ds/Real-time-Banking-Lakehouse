@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Kiểm tra sức khỏe toàn bộ hệ thống bằng MỘT lệnh (8 nhóm):
+# Kiểm tra sức khỏe toàn bộ hệ thống bằng MỘT lệnh (9 nhóm):
 #
 #     bash scripts/kiem_tra.sh
 #
@@ -171,6 +171,33 @@ else
   v=$(q "SELECT count(*) FROM iceberg.gold.fraud_alerts WHERE cardinality(reasons) = 0")
   if is_num "$v" && [ "$v" -eq 0 ]; then ok "Mọi cảnh báo đều có lý do đi kèm"
   elif is_num "$v"; then warn "$v cảnh báo không có lý do (ngưỡng điểm quá thấp?)"; fi
+fi
+
+# -----------------------------------------------------------------------------
+hdr "9. dbt, bảo trì Iceberg, Airflow (Giai đoạn 4)"
+v=$(q "SELECT count(*) FROM iceberg.information_schema.tables WHERE table_schema = 'marts'")
+if is_num "$v" && [ "$v" -ge 3 ]; then ok "dbt đã dựng $v bảng báo cáo trong iceberg.marts"
+else warn "Chưa có bảng dbt  →  docker compose --profile jobs run --rm dbt"; fi
+
+v=$(q "SELECT count(*) FROM iceberg.information_schema.tables WHERE table_schema = 'ops' AND table_name = 'maintenance_log'")
+if is_num "$v" && [ "$v" -eq 1 ]; then
+  r=$(q "SELECT concat(cast(files_before AS varchar), ' ', cast(files_after AS varchar), ' ', cast(query_sec_before AS varchar), ' ', cast(query_sec_after AS varchar)) FROM iceberg.ops.maintenance_log WHERE table_name = 'lakehouse.bronze.transactions_raw' ORDER BY run_time DESC LIMIT 1")
+  if [ -n "$r" ]; then
+    read -r fb fa qb qa <<< "$r"
+    ok "Lần bảo trì gần nhất (Bronze): $fb → $fa file, truy vấn $qb s → $qa s"
+  fi
+else
+  warn "Chưa chạy bảo trì Iceberg  →  docker compose --profile jobs run --rm maintenance"
+fi
+
+# Airflow riêng của dự án (container "airflow") hoặc Airflow có sẵn trên máy (…scheduler…)
+af=$(docker ps --format '{{.Names}}' | grep -E '^airflow$|airflow.*scheduler' | head -n 1)
+if [ -z "$af" ]; then
+  warn "Không thấy Airflow đang chạy (tùy chọn)  →  bật Airflow của bạn rồi: bash scripts/noi_airflow_co_san.sh"
+else
+  n=$(docker exec "$af" airflow dags list 2>/dev/null | grep -c 'lakehouse_')
+  if is_num "$n" && [ "$n" -ge 3 ]; then ok "Airflow ($af) có đủ 3 DAG lakehouse"
+  else warn "Airflow ($af) chưa thấy DAG lakehouse  →  bash scripts/noi_airflow_co_san.sh"; fi
 fi
 
 if [ -s "$LASTERR" ]; then

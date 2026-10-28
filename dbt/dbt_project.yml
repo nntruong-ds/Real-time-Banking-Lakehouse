@@ -1,0 +1,21 @@
+# dbt: biến dữ liệu Gold thành các bảng báo cáo (mart) bằng SQL chạy trên Trino,
+# kèm test chất lượng và test ĐỐI SOÁT giữa các tầng. Chạy tất cả bằng:  dbt build
+name: lakehouse
+version: "1.0.0"
+config-version: 2
+profile: lakehouse
+
+model-paths: ["models"]
+test-paths: ["tests"]
+
+vars:
+  # Cổng chất lượng mô hình: lần chạy job gold mới nhất phải đạt ít nhất mức này trên TEST
+  min_precision: 0.5
+  min_recall: 0.5
+
+models:
+  lakehouse:
+    marts:
+      +materialized: table
+      # Trino + Nessie: xóa bảng cũ rồi tạo lại (đơn giản, chắc chắn chạy được)
+      +on_table_exists: drop

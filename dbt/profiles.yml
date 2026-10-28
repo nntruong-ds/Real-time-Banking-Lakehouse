@@ -1,0 +1,14 @@
+# Kết nối dbt -> Trino (chạy trong mạng Docker "lakehouse"). Không có mật khẩu: môi trường học tập.
+lakehouse:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      user: dbt
+      host: trino
+      port: 8080
+      http_scheme: http
+      database: iceberg      # catalog Iceberg trong Trino
+      schema: marts          # các bảng dbt tạo ra nằm ở iceberg.marts
+      threads: 2

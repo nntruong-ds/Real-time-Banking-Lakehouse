@@ -4,11 +4,13 @@
 # Các nhóm service (profile):
 #   (mặc định)  hạ tầng: kho S3, Nessie + Postgres, Kafka, Trino
 #   realtime    producer + 2 Spark job streaming (Bronze, Silver) tự chạy, tự khởi động lại
-#   jobs        chạy một lần: unit test (spark-tools), nạp lịch sử (backfill)
+#   jobs        chạy một lần: unit test (spark-tools), nạp lịch sử (backfill), gold, dbt, maintenance
+#   airflow     Airflow 3 điều phối các job trên theo lịch (http://localhost:8089)
 #
 #   docker compose up -d                          # chỉ hạ tầng
 #   docker compose --profile realtime up -d       # hạ tầng + luồng realtime
 #   docker compose --profile jobs run --rm spark-tools          # chạy unit test
+#   docker compose --profile airflow up -d        # bật Airflow (Giai đoạn 4)
 #   docker compose --profile realtime down        # tắt, giữ dữ liệu
 #   docker compose --profile realtime down -v     # tắt và XÓA toàn bộ dữ liệu
 #
@@ -353,12 +355,114 @@ services:
     restart: "no"
     mem_limit: 3g
 
+  # Bảo trì Iceberg (Giai đoạn 4): gộp file nhỏ, đo số file + thời gian truy vấn trước/sau.
+  #   docker compose --profile jobs run --rm maintenance
+  maintenance:
+    <<: *spark
+    container_name: maintenance
+    profiles: [jobs]
+    entrypoint: ["spark-submit", "--master", "local[2]", "--driver-memory", "2g",
+                 "--name", "iceberg_maintenance", "/opt/app/spark_jobs/iceberg_maintenance.py"]
+    command: []
+    depends_on:
+      nessie:
+        condition: service_healthy
+    ports:
+      - "4044:4040"   # Spark UI của job bảo trì (chỉ mở khi đang chạy)
+    restart: "no"
+    mem_limit: 3g
+
+  # dbt (Giai đoạn 4): dựng bảng báo cáo iceberg.marts.* bằng SQL trên Trino + test đối soát.
+  #   docker compose --profile jobs run --rm dbt              # = dbt build (model + test)
+  #   docker compose --profile jobs run --rm dbt test         # chỉ chạy test
+  dbt:
+    build: ./docker/dbt
+    image: lakehouse-dbt:1.11.16
+    container_name: dbt
+    profiles: [jobs]
+    volumes:
+      - ./dbt:/dbt:ro
+    depends_on:
+      trino:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 1g
+    networks: [lakehouse]
+
+  # ===========================================================================
+  # ĐIỀU PHỐI (profile: airflow) — Giai đoạn 4
+  # Airflow 3 chạy gọn trong MỘT container ("standalone": api-server + scheduler +
+  # dag-processor + triggerer) để vừa máy 16 GB. Mỗi task Spark/dbt chạy trong container
+  # riêng nhờ Docker trên máy (gắn /var/run/docker.sock).
+  #   docker compose --profile airflow up -d      -> giao diện: http://localhost:8089
+  # ===========================================================================
+  airflow-db:
+    image: postgres:16.4
+    container_name: airflow-db
+    profiles: [airflow]
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow", "-d", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    mem_limit: 256m
+    restart: unless-stopped
+    networks: [lakehouse]
+
+  airflow:
+    build: ./docker/airflow
+    image: lakehouse-airflow:3.3.2
+    container_name: airflow
+    profiles: [airflow]
+    command: standalone
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__PARALLELISM: "4"
+      # Môi trường học tập trên máy cá nhân: không cần đăng nhập, ai mở cũng là admin
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-lakehouse-local-dev-only}
+      AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"     # thấy DAG mới sau ~30 giây
+      # Cho DAG biết thư mục dự án NẰM Ở ĐÂU TRÊN MÁY (để gắn code vào container Spark/dbt).
+      # Luôn chạy docker compose từ thư mục dự án để ${PWD} đúng.
+      HOST_PROJECT_DIR: ${PWD}
+      PII_HMAC_KEY: ${PII_HMAC_KEY:-}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow-logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"    # nhóm "docker" trên máy: cho Airflow quyền dùng docker.sock
+    ports:
+      - "8089:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    mem_limit: 2560m
+    restart: unless-stopped
+    networks: [lakehouse]
+
 volumes:
   producer-state:
   kafka-data:
   object-data:
   nessie-db-data:
   spark-checkpoints:
+  airflow-db-data:
+  airflow-logs:
 
 networks:
   lakehouse:
