@@ -1,0 +1,30 @@
+slice_name: "Th\u1EBB theo m\u1EE9c r\u1EE7i ro"
+description: null
+certified_by: null
+certification_details: null
+viz_type: pie
+params:
+  groupby:
+  - risk_status
+  metric:
+    expressionType: SQL
+    sqlExpression: COUNT(*)
+    label: "S\u1ED1 th\u1EBB"
+    optionName: metric_b93b28c27f24
+    hasCustomLabel: true
+  adhoc_filters: []
+  row_limit: 10
+  show_labels: true
+  label_type: value
+  labels_outside: false
+  show_legend: true
+  legendOrientation: bottom
+  legendType: plain
+  donut: true
+  viz_type: pie
+  datasource: 7__table
+query_context: null
+cache_timeout: null
+uuid: 45428522-40ba-40bc-b35a-5dcfafd724fa
+version: 1.0.0
+dataset_uuid: b5693060-e03b-4eed-8fd0-58ebb69a71e5

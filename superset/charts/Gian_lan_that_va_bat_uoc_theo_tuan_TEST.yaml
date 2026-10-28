@@ -1,0 +1,41 @@
+slice_name: "Gian l\u1EADn th\u1EADt v\xE0 b\u1EAFt \u0111\u01B0\u1EE3c theo tu\u1EA7\
+  n (TEST)"
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_line
+params:
+  x_axis: event_date
+  time_grain_sqla: P1W
+  metrics:
+  - expressionType: SQL
+    sqlExpression: SUM(frauds)
+    label: "Gian l\u1EADn th\u1EADt"
+    optionName: metric_b8208bc4ee7b
+    hasCustomLabel: true
+  - expressionType: SQL
+    sqlExpression: SUM(true_alerts)
+    label: "B\u1EAFt \u0111\u01B0\u1EE3c"
+    optionName: metric_436b10859348
+    hasCustomLabel: true
+  groupby: []
+  adhoc_filters:
+  - expressionType: SIMPLE
+    subject: split
+    operator: ==
+    comparator: test
+    clause: WHERE
+    filterOptionName: filter_70eee86b69d9
+  row_limit: 10000
+  show_legend: true
+  rich_tooltip: true
+  markerEnabled: true
+  y_axis_format: SMART_NUMBER
+  x_axis_time_format: smart_date
+  viz_type: echarts_timeseries_line
+  datasource: 2__table
+query_context: null
+cache_timeout: null
+uuid: f565758f-3d3c-4634-b9ae-78e42ea57d1c
+version: 1.0.0
+dataset_uuid: 7b948211-2bb2-4401-a63a-f126dfd381c4

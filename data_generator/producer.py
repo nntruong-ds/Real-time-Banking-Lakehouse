@@ -21,15 +21,12 @@ Ba loại bản ghi được sinh ra:
                burst = một thẻ quẹt dồn dập nhiều lần trong vài chục giây
                geo   = một thẻ quẹt ở 2 thành phố xa nhau trong vài phút
   - invalid  : bản ghi sai nghiệp vụ, dùng để kiểm tra DLQ ở Mốc 2
-  - bản ghi trùng: thỉnh thoảng một giao dịch bị gửi 2 lần (cùng
-               transaction_id), giống lỗi retry ngoài đời; Mốc 2 phải bỏ trùng
 
 Cột "sim_scenario" chỉ có trong dữ liệu giả lập, giúp bạn kiểm tra kết quả.
 Dữ liệu ngân hàng thật không có cột này.
 
 Cấu hình qua biến môi trường (xem docker-compose.yml):
-  KAFKA_BOOTSTRAP, KAFKA_TOPIC, RATE, INVALID_RATIO, FRAUD_RATIO,
-  DUPLICATE_RATIO
+  KAFKA_BOOTSTRAP, KAFKA_TOPIC, RATE, INVALID_RATIO, FRAUD_RATIO
 """
 
 import json
@@ -51,7 +48,6 @@ KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "transactions")
 RATE = float(os.getenv("RATE", "50"))                  # giao dịch / giây
 INVALID_RATIO = float(os.getenv("INVALID_RATIO", "0.005"))
 FRAUD_RATIO = float(os.getenv("FRAUD_RATIO", "0.003"))
-DUPLICATE_RATIO = float(os.getenv("DUPLICATE_RATIO", "0.005"))
 NUM_ACCOUNTS = int(os.getenv("NUM_ACCOUNTS", "2000"))
 SEED = int(os.getenv("SEED", "42"))
 
@@ -158,9 +154,6 @@ def next_batch(accounts):
         return make_invalid(acc)
     if r < INVALID_RATIO + FRAUD_RATIO:
         return random.choice([make_fraud_burst, make_fraud_geo])(acc)
-    if r < INVALID_RATIO + FRAUD_RATIO + DUPLICATE_RATIO:
-        txn = make_transaction(acc)
-        return [txn, dict(txn)]     # gửi 2 lần y hệt nhau
     return [make_transaction(acc)]
 
 

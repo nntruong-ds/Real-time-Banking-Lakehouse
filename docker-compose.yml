@@ -6,6 +6,7 @@
 #   realtime    producer + 2 Spark job streaming (Bronze, Silver) tự chạy, tự khởi động lại
 #   jobs        chạy một lần: unit test (spark-tools), nạp lịch sử (backfill), gold, dbt, maintenance
 #   airflow     Airflow 3 điều phối các job trên theo lịch (http://localhost:8089)
+#   bi          Superset: dashboard đọc qua Trino (http://localhost:8088)
 #
 #   docker compose up -d                          # chỉ hạ tầng
 #   docker compose --profile realtime up -d       # hạ tầng + luồng realtime
@@ -455,6 +456,45 @@ services:
     restart: unless-stopped
     networks: [lakehouse]
 
+  # ===========================================================================
+  # DASHBOARD (profile: bi) — Giai đoạn 5
+  # Superset đọc các bảng iceberg.marts.* qua Trino. Dashboard nằm dạng YAML trong
+  # thư mục superset/ của repo và được nạp lại mỗi lần container khởi động.
+  #   docker compose --profile bi up -d        -> http://localhost:8088 (admin / admin)
+  # ===========================================================================
+  superset:
+    build: ./docker/superset
+    image: lakehouse-superset:6.1.0
+    container_name: superset
+    profiles: [bi]
+    entrypoint: ["bash", "/app/init.sh"]
+    environment:
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-lakehouse-local-dev-only-change-me}
+      SUPERSET_ADMIN_USER: ${SUPERSET_ADMIN_USER:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SERVER_WORKER_AMOUNT: "1"
+    volumes:
+      - superset-home:/app/superset_home
+      - ./superset:/app/dashboards:ro
+      - ./docker/superset/superset_config.py:/app/superset_config.py:ro
+      - ./docker/superset/init.sh:/app/init.sh:ro
+      - ./docker/superset/import_dashboards.py:/app/import_dashboards.py:ro
+    ports:
+      - "8088:8088"
+    depends_on:
+      trino:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8088/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    mem_limit: 1536m
+    restart: unless-stopped
+    networks: [lakehouse]
+
 volumes:
   producer-state:
   kafka-data:
@@ -463,6 +503,7 @@ volumes:
   spark-checkpoints:
   airflow-db-data:
   airflow-logs:
+  superset-home:
 
 networks:
   lakehouse:

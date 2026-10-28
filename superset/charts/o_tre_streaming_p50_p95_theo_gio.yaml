@@ -1,0 +1,33 @@
+slice_name: "\u0110\u1ED9 tr\u1EC5 streaming p50 / p95 theo gi\u1EDD"
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_line
+params:
+  x_axis: hour_start
+  time_grain_sqla: PT1H
+  metrics:
+  - expressionType: SQL
+    sqlExpression: MAX(p50_sec)
+    label: "p50 (gi\xE2y)"
+    optionName: metric_c2974f70fc9a
+    hasCustomLabel: true
+  - expressionType: SQL
+    sqlExpression: MAX(p95_sec)
+    label: "p95 (gi\xE2y)"
+    optionName: metric_25d90aef1ca0
+    hasCustomLabel: true
+  groupby: []
+  adhoc_filters: []
+  row_limit: 10000
+  show_legend: true
+  rich_tooltip: true
+  markerEnabled: true
+  y_axis_format: .1f
+  viz_type: echarts_timeseries_line
+  datasource: 4__table
+query_context: null
+cache_timeout: null
+uuid: 8fad31a4-ddc7-4495-b34b-cfc6bcfb5e9a
+version: 1.0.0
+dataset_uuid: 503d76fc-4f84-4b96-9937-c848e2baf6f2

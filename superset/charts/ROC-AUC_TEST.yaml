@@ -1,0 +1,24 @@
+slice_name: ROC-AUC (TEST)
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(roc_auc)
+    label: ROC-AUC
+    optionName: metric_ade4c4835d4a
+    hasCustomLabel: true
+  adhoc_filters: []
+  subheader: "0,5 = \u0111o\xE1n m\xF2 \xB7 1,0 = ho\xE0n h\u1EA3o"
+  y_axis_format: .3f
+  header_font_size: 0.4
+  subheader_font_size: 0.2
+  viz_type: big_number_total
+  datasource: 1__table
+query_context: null
+cache_timeout: null
+uuid: fb0cae16-8adc-42d2-9a66-651e45756731
+version: 1.0.0
+dataset_uuid: 4afa0f5b-fded-442e-9fbf-13c73855f378

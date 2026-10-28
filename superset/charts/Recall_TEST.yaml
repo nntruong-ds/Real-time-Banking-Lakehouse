@@ -1,0 +1,24 @@
+slice_name: Recall (TEST)
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(recall)
+    label: Recall
+    optionName: metric_985ff3e7f794
+    hasCustomLabel: true
+  adhoc_filters: []
+  subheader: "gian l\u1EADn b\u1EAFt \u0111\u01B0\u1EE3c / t\u1ED5ng gian l\u1EADn"
+  y_axis_format: .3f
+  header_font_size: 0.4
+  subheader_font_size: 0.2
+  viz_type: big_number_total
+  datasource: 1__table
+query_context: null
+cache_timeout: null
+uuid: 639f3d89-7c0a-48d5-8e1c-b14a4127884d
+version: 1.0.0
+dataset_uuid: 4afa0f5b-fded-442e-9fbf-13c73855f378

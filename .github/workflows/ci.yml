@@ -74,4 +74,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose --profile realtime --profile jobs --profile airflow config --quiet
+      - run: docker compose --profile realtime --profile jobs --profile airflow --profile bi config --quiet

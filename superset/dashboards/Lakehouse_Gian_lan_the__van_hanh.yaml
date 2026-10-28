@@ -1,0 +1,298 @@
+dashboard_title: "Lakehouse \xB7 Gian l\u1EADn th\u1EBB & v\u1EADn h\xE0nh"
+description: null
+css: null
+slug: lakehouse
+certified_by: null
+certification_details: null
+published: true
+uuid: 9abd7bf5-4415-4c68-aade-e54f85d45cbf
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    type: ROOT
+    id: ROOT_ID
+    children:
+    - GRID_ID
+  GRID_ID:
+    type: GRID
+    id: GRID_ID
+    children:
+    - ROW-44595e6f
+    - ROW-71908a31
+    - ROW-6d3da9d3
+    - ROW-3bc1ac10
+    - ROW-9527d85c
+    - ROW-b575152e
+    parents:
+    - ROOT_ID
+  HEADER_ID:
+    id: HEADER_ID
+    type: HEADER
+    meta:
+      text: "Lakehouse \xB7 Gian l\u1EADn th\u1EBB & v\u1EADn h\xE0nh"
+  ROW-44595e6f:
+    type: ROW
+    id: ROW-44595e6f
+    children:
+    - MARKDOWN-8d650caa
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  MARKDOWN-8d650caa:
+    type: MARKDOWN
+    id: MARKDOWN-8d650caa
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-44595e6f
+    meta:
+      width: 12
+      height: 22
+      code: "### Lakehouse giao d\u1ECBch th\u1EBB\nD\u1EEF li\u1EC7u: Sparkov (Kaggle),\
+        \ 1,85 tri\u1EC7u giao d\u1ECBch. **TRAIN** = 01/2019 \u2192 21/06/2020 (scorecard\
+        \ h\u1ECDc tr\xEAn ph\u1EA7n n\xE0y), **TEST** = 21/06 \u2192 31/12/2020 (ch\u01B0\
+        a t\u1EEBng th\u1EA5y).\n\nNgu\u1ED3n: c\xE1c b\u1EA3ng `iceberg.marts.*`\
+        \ do dbt d\u1EF1ng, \u0111\u1ECDc qua Trino."
+  ROW-71908a31:
+    type: ROW
+    id: ROW-71908a31
+    children:
+    - CHART-c10e08aa
+    - CHART-d9360ea3
+    - CHART-d1f6c329
+    - CHART-627c560c
+    - CHART-6b296eeb
+    - CHART-888b9fef
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-c10e08aa:
+    type: CHART
+    id: CHART-c10e08aa
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-71908a31
+    meta:
+      width: 2
+      height: 40
+      chartId: 1
+      sliceName: "Ti\u1EC1n gian l\u1EADn ch\u1EB7n \u0111\u01B0\u1EE3c (TEST)"
+      uuid: b11fc681-aa94-4dac-ab3c-3e8647a471b6
+  CHART-d9360ea3:
+    type: CHART
+    id: CHART-d9360ea3
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-71908a31
+    meta:
+      width: 2
+      height: 40
+      chartId: 2
+      sliceName: Precision (TEST)
+      uuid: 0ede9192-6b6d-46a2-853a-88280c1eb4bc
+  CHART-d1f6c329:
+    type: CHART
+    id: CHART-d1f6c329
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-71908a31
+    meta:
+      width: 2
+      height: 40
+      chartId: 3
+      sliceName: Recall (TEST)
+      uuid: 639f3d89-7c0a-48d5-8e1c-b14a4127884d
+  CHART-627c560c:
+    type: CHART
+    id: CHART-627c560c
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-71908a31
+    meta:
+      width: 2
+      height: 40
+      chartId: 4
+      sliceName: ROC-AUC (TEST)
+      uuid: fb0cae16-8adc-42d2-9a66-651e45756731
+  CHART-6b296eeb:
+    type: CHART
+    id: CHART-6b296eeb
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-71908a31
+    meta:
+      width: 2
+      height: 40
+      chartId: 5
+      sliceName: "\u0110\u1ED9 tr\u1EC5 streaming p50"
+      uuid: d29791b1-7179-4895-a589-791b12d9e899
+  CHART-888b9fef:
+    type: CHART
+    id: CHART-888b9fef
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-71908a31
+    meta:
+      width: 2
+      height: 40
+      chartId: 6
+      sliceName: "\u0110\u1ED9 tr\u1EC5 streaming p95"
+      uuid: ef05c4e7-8a60-4cf3-9855-96e74ad499a4
+  ROW-6d3da9d3:
+    type: ROW
+    id: ROW-6d3da9d3
+    children:
+    - CHART-6e75e15e
+    - CHART-ca4189d4
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-6e75e15e:
+    type: CHART
+    id: CHART-6e75e15e
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-6d3da9d3
+    meta:
+      width: 8
+      height: 60
+      chartId: 7
+      sliceName: "Gian l\u1EADn th\u1EADt v\xE0 b\u1EAFt \u0111\u01B0\u1EE3c theo\
+        \ tu\u1EA7n (TEST)"
+      uuid: f565758f-3d3c-4634-b9ae-78e42ea57d1c
+  CHART-ca4189d4:
+    type: CHART
+    id: CHART-ca4189d4
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-6d3da9d3
+    meta:
+      width: 4
+      height: 60
+      chartId: 10
+      sliceName: "Th\u1EBB theo m\u1EE9c r\u1EE7i ro"
+      uuid: 45428522-40ba-40bc-b35a-5dcfafd724fa
+  ROW-3bc1ac10:
+    type: ROW
+    id: ROW-3bc1ac10
+    children:
+    - CHART-f04d9a74
+    - CHART-6fd95819
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-f04d9a74:
+    type: CHART
+    id: CHART-f04d9a74
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-3bc1ac10
+    meta:
+      width: 6
+      height: 60
+      chartId: 8
+      sliceName: "T\u1EF7 l\u1EC7 gian l\u1EADn theo danh m\u1EE5c (%)"
+      uuid: fb2d990c-e872-4b86-b481-c476db2be4f9
+  CHART-6fd95819:
+    type: CHART
+    id: CHART-6fd95819
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-3bc1ac10
+    meta:
+      width: 6
+      height: 60
+      chartId: 9
+      sliceName: "\u0110\u1ED9 tr\u1EC5 streaming p50 / p95 theo gi\u1EDD"
+      uuid: 8fad31a4-ddc7-4495-b34b-cfc6bcfb5e9a
+  ROW-9527d85c:
+    type: ROW
+    id: ROW-9527d85c
+    children:
+    - CHART-f778f8c2
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-f778f8c2:
+    type: CHART
+    id: CHART-f778f8c2
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-9527d85c
+    meta:
+      width: 12
+      height: 34
+      chartId: 11
+      sliceName: "B\u1EA3o tr\xEC Iceberg: s\u1ED1 file v\xE0 th\u1EDDi gian truy\
+        \ v\u1EA5n"
+      uuid: 0b197e1e-cdfb-423e-ae0f-7c2a62afa1ef
+  ROW-b575152e:
+    type: ROW
+    id: ROW-b575152e
+    children:
+    - CHART-23464c2c
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-23464c2c:
+    type: CHART
+    id: CHART-23464c2c
+    children: []
+    parents:
+    - ROOT_ID
+    - GRID_ID
+    - ROW-b575152e
+    meta:
+      width: 12
+      height: 80
+      chartId: 12
+      sliceName: "H\xE0ng \u0111\u1EE3i c\u1EA3nh b\xE1o \u2014 \u0111i\u1EC3m cao\
+        \ nh\u1EA5t (TEST)"
+      uuid: f10eb88d-82ad-447a-b2f8-b5a402c01952
+metadata:
+  native_filter_configuration: []
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  label_colors: {}
+  shared_label_colors: []
+  timed_refresh_immune_slices: []
+  expanded_slices: {}
+  default_filters: '{}'
+  cross_filters_enabled: false
+theme_uuid: null
+version: 1.0.0

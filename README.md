@@ -3,10 +3,11 @@
 Lakehouse xử lý giao dịch thẻ ngân hàng — vừa **batch** (nạp lịch sử) vừa **streaming** (thời gian thực) — chạy hoàn toàn trên máy local bằng Docker:
 **Kafka → Spark Structured Streaming → Apache Iceberg (catalog Nessie, kho S3) → Trino**.
 
-> **Trạng thái: Giai đoạn 4 — dbt, Airflow, bảo trì Iceberg.** Dữ liệu là dataset giao dịch thẻ công khai **Sparkov** (Kaggle, ~1,85 triệu giao dịch, có nhãn gian lận).
+> **Trạng thái: Giai đoạn 5 — Dashboard Superset dạng code.** Dữ liệu là dataset giao dịch thẻ công khai **Sparkov** (Kaggle, ~1,85 triệu giao dịch, có nhãn gian lận).
 > Lịch sử 2019 → 06/2020 nạp bằng job batch; nửa cuối 2020 được phát lại qua Kafka như hệ thống thanh toán đang chạy.
 > Tầng Gold tính đặc trưng theo thẻ, chấm điểm bằng **scorecard WoE** học trên lịch sử; trên 6 tháng cuối 2020 mà scorecard chưa từng thấy đạt **precision 0,62 · recall 0,62**.
-> **dbt** dựng bảng báo cáo và chạy test đối soát giữa các tầng; **Airflow 3** lên lịch mọi job; job **bảo trì Iceberg** gộp file nhỏ và đo hiệu quả trước/sau.
+> **dbt** dựng bảng báo cáo và chạy test đối soát giữa các tầng; **Airflow** lên lịch mọi job; job **bảo trì Iceberg** gộp file nhỏ và đo hiệu quả trước/sau.
+> **Superset** hiển thị dashboard (tiền gian lận chặn được, precision/recall/AUC, độ trễ streaming p50/p95, hàng đợi cảnh báo), dashboard lưu dạng YAML trong repo.
 
 Hướng dẫn viết cho **Ubuntu 22.04 / 24.04**, máy **16 GB RAM**. Mọi lệnh gõ trong Terminal, đứng trong thư mục dự án.
 
@@ -30,7 +31,8 @@ Hướng dẫn viết cho **Ubuntu 22.04 / 24.04**, máy **16 GB RAM**. Mọi l�
  [dbt] (SQL trên Trino) ─► marts.fct_daily_fraud · marts.dim_card_risk · marts.agg_category_month
                            + test chất lượng, test ĐỐI SOÁT Bronze↔Silver↔Gold, cổng chất lượng mô hình
  [maintenance] (Spark)  ─► gộp file nhỏ mọi bảng, ghi số file + thời gian truy vấn trước/sau vào ops.maintenance_log
- [Airflow 3] lên lịch:  lakehouse_daily (gold → dbt build) · lakehouse_backfill (18 tháng) · lakehouse_maintenance (hằng tuần)
+ [Airflow] lên lịch:    lakehouse_daily (gold → dbt build) · lakehouse_backfill (18 tháng) · lakehouse_maintenance (hằng tuần)
+ [Superset] ─► dashboard đọc marts.* qua Trino; định nghĩa dashboard = YAML trong superset/, tự nạp khi khởi động
 
 Bảng Iceberg:  metadata trong Nessie (lưu ở Postgres)  ·  file Parquet trên kho S3 (RustFS)
 Truy vấn:      Trino  (catalog "iceberg")
@@ -45,7 +47,8 @@ Truy vấn:      Trino  (catalog "iceberg")
 | Trino | SQL trên các bảng Iceberg | `trinodb/trino:476` |
 | Producer | Phát lại dataset vào Kafka theo nhịp thời gian | Python 3.12 |
 | dbt | Bảng báo cáo + test đối soát, chạy SQL trên Trino | `dbt-core 1.11.16`, `dbt-trino 1.10.6` |
-| Airflow | Lên lịch, chạy lại khi lỗi, nạp lịch sử theo tháng | `apache/airflow:3.3.2` (LocalExecutor) |
+| Airflow | Lên lịch, chạy lại khi lỗi, nạp lịch sử theo tháng | `apache/airflow:3.3.2` (LocalExecutor), hoặc Airflow 2.4+ có sẵn |
+| Superset | Dashboard, đọc qua Trino | `apache/superset:6.1.0` + driver `trino` |
 
 ### Dữ liệu
 
@@ -82,6 +85,9 @@ Dữ liệu thật không có lỗi hay bản trùng, nên producer **cài thêm
 - **Airflow chỉ điều phối, không chạy việc nặng**: mỗi task là một container Spark/dbt riêng (`DockerOperator`, dùng đúng image của compose), xong thì tự xóa. Airflow 3 chạy dạng `standalone` trong một container để vừa máy 16 GB; môi trường production sẽ tách api-server, scheduler, dag-processor và chạy task trên Kubernetes.
 - **Nạp lịch sử theo tháng bằng dynamic task mapping**: 18 task, tháng nào lỗi chạy lại tháng đó; job dùng MERGE nên chạy lại không trùng.
 - **Test đối soát trong dbt**: Bronze (đếm theo `transaction_id`) = Silver = Gold, tổng tiền khớp tới từng xu, bảng cảnh báo khớp bảng đặc trưng; thêm **cổng chất lượng mô hình** (precision/recall trên TEST ≥ 0,5) — sửa code làm mô hình tệ đi thì pipeline báo đỏ.
+- **Bảo trì Iceberg: mỗi bảng một commit** (tắt `partial-progress`): metadata mà Nessie trả về chỉ chứa snapshot hiện tại, nên commit từng phần làm các commit sau không kiểm được lịch sử (`Cannot determine history`). Cũng vì vậy phải tắt luồng streaming khi bảo trì.
+- **Dashboard dạng code**: Superset chỉ đọc `marts.*`; mọi phép tính (p50/p95, tỷ lệ tiền chặn được...) nằm trong dbt, có test. Dashboard được export thành YAML trong `superset/` và nạp lại mỗi lần container khởi động — sửa trên giao diện xong thì `bash scripts/xuat_dashboard.sh` để lưu ngược về git.
+- **Độ trễ đầu-cuối đo trên dữ liệu thật**: `kafka_timestamp` (lúc producer gửi, ở Bronze) → `silver_time` (lúc mẻ streaming ghi Silver), lấy p50/p95 trên mọi giao dịch đi qua stream (`marts.fct_stream_latency`, `marts.kpi_summary`).
 - **Bảo trì Iceberg không dùng `expire_snapshots`/`remove_orphan_files`**: với Nessie, dọn snapshot và file thừa là việc của Nessie GC (biết file nào còn được branch/tag khác dùng). Job chỉ gộp file (`rewrite_data_files`) và manifest (`rewrite_manifests`).
 
 ---
@@ -246,7 +252,7 @@ Spark UI: http://localhost:4040 (Bronze), http://localhost:4041 (Silver), tab **
 bash scripts/kiem_tra.sh
 ```
 
-Script kiểm tra 9 nhóm — container, Kafka, log lỗi, dữ liệu có đang chảy không, chất lượng (DLQ, bỏ trùng), bảo mật PII, dữ liệu lịch sử, tầng Gold, dbt/bảo trì/Airflow — và in ✅ / ⚠️ / ❌ kèm gợi ý sửa. Dòng cuối `0 lỗi` là hệ thống chạy tốt. ⚠️ trong 3 phút đầu sau khi bật là bình thường.
+Script kiểm tra 10 nhóm — container, Kafka, log lỗi, dữ liệu có đang chảy không, chất lượng (DLQ, bỏ trùng), bảo mật PII, dữ liệu lịch sử, tầng Gold, dbt/bảo trì/Airflow, dashboard — và in ✅ / ⚠️ / ❌ kèm gợi ý sửa. Dòng cuối `0 lỗi` là hệ thống chạy tốt. ⚠️ trong 3 phút đầu sau khi bật là bình thường.
 
 ---
 
@@ -340,12 +346,28 @@ DAG mới tạo ở trạng thái tạm dừng: bật công tắc bên trái tê
 
 ---
 
-## Bước 10 — Đẩy lên GitHub
+## Bước 10 — Dashboard Superset
+
+```bash
+printf '\nSUPERSET_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env   # làm 1 lần
+docker compose --profile jobs run --rm dbt         # dựng các mart mà dashboard đọc
+docker compose --profile bi build superset          # lần đầu tải image ~1 GB
+docker compose --profile bi up -d
+docker logs -f superset                             # đợi dòng "[superset] San sang", Ctrl+C để thoát
+```
+
+Mở http://localhost:8088 (admin / admin) → **Dashboards** → *Lakehouse · Gian lận thẻ & vận hành*: 6 ô số (tiền gian lận chặn được, precision, recall, ROC-AUC, độ trễ p50/p95), gian lận theo tuần, thẻ theo mức rủi ro, tỷ lệ gian lận theo danh mục, độ trễ theo giờ, số file trước/sau bảo trì, hàng đợi cảnh báo kèm lý do.
+
+Dashboard nằm trong `superset/` dạng YAML. Sửa trên giao diện xong: `bash scripts/xuat_dashboard.sh` rồi `git diff superset/`.
+
+---
+
+## Bước 11 — Đẩy lên GitHub
 
 ```bash
 git add .
 git status            # KHÔNG được thấy .env hay datasets/
-git commit -m "Giai doan 4: dbt + test doi soat, Airflow 3, bao tri Iceberg"
+git commit -m "Giai doan 5: dashboard Superset dang code, do do tre p50/p95"
 git push
 ```
 
@@ -370,6 +392,8 @@ Mỗi lần push, GitHub Actions tự chạy lint, unit test và kiểm tra `doc
 | Tính lại tầng Gold và điểm gian lận | `docker compose --profile jobs run --rm gold` |
 | Dựng lại bảng báo cáo + chạy test đối soát | `docker compose --profile jobs run --rm dbt` |
 | Gộp file nhỏ (bảo trì Iceberg) | `docker compose --profile jobs run --rm maintenance` |
+| Bật / tắt dashboard | `docker compose --profile bi up -d` / `docker compose --profile bi stop` |
+| Lưu dashboard vừa sửa trên giao diện về code | `bash scripts/xuat_dashboard.sh` |
 | Bật / tắt Airflow | `docker compose --profile airflow up -d` / `docker compose --profile airflow stop` |
 | Xem DAG có lỗi nạp không | `docker exec airflow airflow dags list-import-errors` |
 | Gỡ một mẻ streaming bị kẹt (tràn bộ nhớ lặp lại) | `bash scripts/go_me_ket.sh` |
@@ -401,6 +425,8 @@ Code Spark và `spark-defaults.conf` được gắn thẳng từ máy vào conta
 | Task Airflow lỗi `Permission denied ... docker.sock` | Thiếu hoặc sai `DOCKER_GID` trong `.env`: `getent group docker \| cut -d: -f3`, sửa `.env`, rồi `--force-recreate airflow` |
 | Task Airflow lỗi `No such image: lakehouse-dbt...` | Chưa build image dbt: `docker compose --profile jobs build dbt` |
 | dbt: `assert_bronze_silver_reconcile` hoặc `assert_silver_gold_reconcile` thất bại | Luồng streaming chưa đuổi kịp, hoặc Silver có dữ liệu mới mà job gold chưa chạy lại. Đợi stream xong / chạy `gold`, rồi chạy lại dbt |
+| Superset log có `LOI khi nap dashboard` | Trino chưa sẵn sàng hoặc chưa có `iceberg.marts`: chạy `docker compose --profile jobs run --rm dbt`, rồi `docker restart superset` |
+| Dashboard hiện "No data" ở ô số | `marts.kpi_summary` trống: chạy job `gold` rồi `dbt` |
 | `port is already allocated` | `sudo ss -ltnp \| grep <cổng>`; đổi số **bên trái** trong `ports:` |
 
 Gặp lỗi khác: chạy `bash scripts/kiem_tra.sh` và gửi toàn bộ kết quả.
@@ -419,9 +445,11 @@ realtime-banking-lakehouse/
 │   ├── spark/                      # Dockerfile Spark 3.5.9 + Iceberg + Kafka; spark-defaults.conf
 │   ├── trino/                      # catalog/iceberg.properties, jvm.config (heap 2 GB)
 │   ├── dbt/Dockerfile              # Image dbt-core + dbt-trino
+│   ├── superset/                   # Dockerfile (Superset 6.1 + driver Trino), superset_config.py, init.sh
 │   └── airflow/Dockerfile          # Airflow 3.3.2 + provider Docker
 ├── dbt/                            # Dự án dbt: models/marts/*.sql, tests/ (đối soát, cổng chất lượng)
 ├── airflow/dags/lakehouse_dags.py   # 3 DAG trong 1 file (Airflow 2.4+ và 3.x)
+├── superset/                       # Dashboard dạng code: database, 7 dataset, 12 chart, 1 dashboard (YAML)
 ├── data_generator/replay.py        # Producer phát lại CSV vào Kafka theo nhịp thời gian
 ├── spark_jobs/
 │   ├── bronze_ingestion.py         # Stream: Kafka -> Bronze + DLQ
@@ -441,7 +469,8 @@ realtime-banking-lakehouse/
 └── scripts/
     ├── kiem_tra.sh                 # Kiểm tra sức khỏe toàn hệ thống bằng 1 lệnh
     ├── noi_airflow_co_san.sh       # Nối dự án vào Airflow có sẵn trên máy
-    └── go_me_ket.sh                # Gỡ mẻ streaming bị kẹt
+    ├── go_me_ket.sh                # Gỡ mẻ streaming bị kẹt
+    └── xuat_dashboard.sh           # Lưu dashboard Superset ngược về code
 ```
 
 ## Bản đồ cổng
@@ -451,7 +480,8 @@ realtime-banking-lakehouse/
 | http://localhost:19120 | Nessie UI — branch, commit, danh sách bảng |
 | http://localhost:9001 | Kho S3 (RustFS) — admin / password |
 | http://localhost:8085 | Trino UI |
-| http://localhost:8089 | Airflow (không cần đăng nhập — chỉ dùng trên máy cá nhân) |
+| http://localhost:8088 | Superset — admin / admin |
+| http://localhost:8089 | Airflow riêng của dự án (không cần đăng nhập — chỉ dùng trên máy cá nhân) |
 | http://localhost:4040 / 4041 / 4042 / 4043 / 4044 | Spark UI của Bronze / Silver / backfill / gold / maintenance |
 | localhost:9092 | Kafka (cho chương trình chạy trên máy bạn) |
 
@@ -460,8 +490,8 @@ realtime-banking-lakehouse/
 - [x] **Giai đoạn 1** — Nền móng: Kafka → Bronze + DLQ → Silver, HMAC, ghim phiên bản, Nessie, job như service, CI
 - [x] **Giai đoạn 2** — Dữ liệu thật Sparkov: producer phát lại, batch backfill dùng chung code với stream, PII mở rộng
 - [x] **Giai đoạn 3** — Gold: đặc trưng theo thẻ, scorecard WoE có lý do; TEST: precision 0,62 · recall 0,62 · F1 0,62
-- [ ] **Giai đoạn 4** — dbt (mart + test đối soát + cổng chất lượng), Airflow 3 (gold → dbt hằng ngày, backfill theo tháng), bảo trì Iceberg đo trước/sau *(đang làm)*
-- [ ] **Giai đoạn 5** — Superset dashboard dạng code; đo độ trễ p50/p95
+- [x] **Giai đoạn 4** — dbt (mart + test đối soát + cổng chất lượng), Airflow (gold → dbt hằng ngày, backfill theo tháng), bảo trì Iceberg đo trước/sau
+- [ ] **Giai đoạn 5** — Superset dashboard dạng code; độ trễ streaming p50/p95 đo thật *(đang làm)*
 - [ ] **Giai đoạn 6** — CD (đẩy image lên GHCR), benchmark trước/sau bảo trì, hoàn thiện README
 
 > Mật khẩu `admin / password` chỉ dùng cho môi trường học tập trên máy cá nhân.

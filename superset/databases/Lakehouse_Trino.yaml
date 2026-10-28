@@ -1,0 +1,18 @@
+database_name: Lakehouse (Trino)
+sqlalchemy_uri: trino://trino@trino:8080/iceberg
+cache_timeout: null
+expose_in_sqllab: true
+allow_run_async: false
+allow_ctas: false
+allow_cvas: false
+allow_dml: false
+allow_file_upload: false
+extra:
+  metadata_params: {}
+  engine_params: {}
+  metadata_cache_timeout: {}
+  schemas_allowed_for_file_upload: []
+impersonate_user: false
+configuration_method: sqlalchemy_form
+uuid: 7cc64aca-67a9-4c31-9c27-4e25ad226b14
+version: 1.0.0

@@ -1,0 +1,30 @@
+slice_name: "T\u1EF7 l\u1EC7 gian l\u1EADn theo danh m\u1EE5c (%)"
+description: null
+certified_by: null
+certification_details: null
+viz_type: echarts_timeseries_bar
+params:
+  x_axis: category
+  metrics:
+  - expressionType: SQL
+    sqlExpression: 100.0 * SUM(frauds) / SUM(transactions)
+    label: "T\u1EF7 l\u1EC7 gian l\u1EADn %"
+    optionName: metric_e120b822d9a6
+    hasCustomLabel: true
+  groupby: []
+  adhoc_filters: []
+  row_limit: 100
+  x_axis_sort: "T\u1EF7 l\u1EC7 gian l\u1EADn %"
+  x_axis_sort_asc: false
+  orientation: vertical
+  show_legend: false
+  show_value: true
+  y_axis_format: .2f
+  xAxisLabelRotation: 45
+  viz_type: echarts_timeseries_bar
+  datasource: 3__table
+query_context: null
+cache_timeout: null
+uuid: fb2d990c-e872-4b86-b481-c476db2be4f9
+version: 1.0.0
+dataset_uuid: ae2e08a4-2b59-4d41-9a1a-c5e920cc9bcb

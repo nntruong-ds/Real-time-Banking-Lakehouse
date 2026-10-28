@@ -1,0 +1,24 @@
+slice_name: Precision (TEST)
+description: null
+certified_by: null
+certification_details: null
+viz_type: big_number_total
+params:
+  metric:
+    expressionType: SQL
+    sqlExpression: MAX(precision)
+    label: Precision
+    optionName: metric_694e3ad4111f
+    hasCustomLabel: true
+  adhoc_filters: []
+  subheader: "c\u1EA3nh b\xE1o \u0111\xFAng / t\u1ED5ng c\u1EA3nh b\xE1o"
+  y_axis_format: .3f
+  header_font_size: 0.4
+  subheader_font_size: 0.2
+  viz_type: big_number_total
+  datasource: 1__table
+query_context: null
+cache_timeout: null
+uuid: 0ede9192-6b6d-46a2-853a-88280c1eb4bc
+version: 1.0.0
+dataset_uuid: 4afa0f5b-fded-442e-9fbf-13c73855f378

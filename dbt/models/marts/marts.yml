@@ -30,3 +30,21 @@ models:
         data_tests: [not_null]
       - name: category
         data_tests: [not_null]
+
+  - name: fct_stream_latency
+    description: Độ trễ Kafka -> Silver (p50/p95) theo từng giờ chạy thật
+    columns:
+      - name: hour_start
+        data_tests: [not_null, unique]
+
+  - name: fct_alert_queue
+    description: 500 cảnh báo điểm cao nhất trên TEST, kèm lý do
+    columns:
+      - name: transaction_id
+        data_tests: [not_null, unique]
+
+  - name: fct_compaction
+    description: Số file và thời gian truy vấn trước/sau lần gộp file thật của từng bảng
+
+  - name: kpi_summary
+    description: Một dòng các con số chính cho dashboard

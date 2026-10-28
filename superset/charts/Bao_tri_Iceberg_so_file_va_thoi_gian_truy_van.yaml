@@ -1,0 +1,27 @@
+slice_name: "B\u1EA3o tr\xEC Iceberg: s\u1ED1 file v\xE0 th\u1EDDi gian truy v\u1EA5\
+  n"
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  query_mode: raw
+  all_columns:
+  - table_name
+  - files_before
+  - files_after
+  - query_sec_before
+  - query_sec_after
+  order_by_cols:
+  - '["files_before", false]'
+  row_limit: 20
+  adhoc_filters: []
+  server_pagination: false
+  include_search: false
+  viz_type: table
+  datasource: 6__table
+query_context: null
+cache_timeout: null
+uuid: 0b197e1e-cdfb-423e-ae0f-7c2a62afa1ef
+version: 1.0.0
+dataset_uuid: 2b4678dc-ed5f-4480-987f-27b90b58a500

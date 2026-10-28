@@ -1,0 +1,30 @@
+slice_name: "H\xE0ng \u0111\u1EE3i c\u1EA3nh b\xE1o \u2014 \u0111i\u1EC3m cao nh\u1EA5\
+  t (TEST)"
+description: null
+certified_by: null
+certification_details: null
+viz_type: table
+params:
+  query_mode: raw
+  all_columns:
+  - event_time
+  - card_last4
+  - category
+  - amount
+  - score
+  - reasons_text
+  - is_true_fraud
+  order_by_cols:
+  - '["score", false]'
+  row_limit: 100
+  adhoc_filters: []
+  server_pagination: false
+  include_search: true
+  page_length: 20
+  viz_type: table
+  datasource: 5__table
+query_context: null
+cache_timeout: null
+uuid: f10eb88d-82ad-447a-b2f8-b5a402c01952
+version: 1.0.0
+dataset_uuid: 3eb6a5f8-dcc8-4622-954e-4572835f2903
